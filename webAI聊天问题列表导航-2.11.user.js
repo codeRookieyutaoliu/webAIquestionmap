@@ -1,21 +1,41 @@
 // ==UserScript==
 // @name         webAI聊天问题列表导航
 // @namespace    http://tampermonkey.net/
-// @version      2.10
+// @version      2.11
 // @description  通过点击按钮显示用户问题列表，支持导航到特定问题、分页功能、正序/倒序切换，优化性能并美化UI，适配CSP限制
 // @author       yutao
 // @match        https://grok.com/chat/*
 // @match        https://github.com/copilot/*
 // @match        https://yuanbao.tencent.com/chat/*
-// @match        https://chat.qwenlm.ai/*
-// @match        https://chat.qwen.ai/*
+// @match        https://chat.qwenlm.ai/c/*
+// @match        https://chat.qwen.ai/c/*
 // @match        https://copilot.microsoft.com/chats/*
-// @match        https://chatgpt.com/*
+// @match        https://chatgpt.com/c/*
 // @match        https://chat.deepseek.com/a/chat/*
-
 // @grant        none
-//@license
-
+// MIT License
+// 
+// Copyright (c) [2025] [yutao]
+// 
+// Permission is hereby granted, free of charge, to any person obtaining a copy
+// of this software and associated documentation files (the "Software"), to deal
+// in the Software without restriction, including without limitation the rights
+// to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+// copies of the Software, and to permit persons to whom the Software is
+// furnished to do so, subject to the following conditions:
+// 
+// The above copyright notice and this permission notice shall be included in all
+// copies or substantial portions of the Software.
+// 
+// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+// IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+// FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+// AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+// LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+// OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+// SOFTWARE.@license
+// @downloadURL https://update.greasyfork.org/scripts/528739/webAI%E8%81%8A%E5%A4%A9%E9%97%AE%E9%A2%98%E5%88%97%E8%A1%A8%E5%AF%BC%E8%88%AA.user.js
+// @updateURL https://update.greasyfork.org/scripts/528739/webAI%E8%81%8A%E5%A4%A9%E9%97%AE%E9%A2%98%E5%88%97%E8%A1%A8%E5%AF%BC%E8%88%AA.meta.js
 // ==/UserScript==
 
 (function () {
@@ -40,12 +60,14 @@
             userCondition: (element) => true
         },
         'chat.qwenlm.ai': {
-            messageSelector: 'div.rounded-3xl.bg-gray-50.dark\\:bg-gray-850',
+
+            //2.10选择器：rounded-[1.25rem] max-w-[90%] text-[16px] leading-[24px] bg-[#F7F8FC] px-3 py-2 dark:bg-gray-850  svelte-112hsd4
+            messageSelector: 'div.rounded-3xl.bg-gray-50.dark\\:bg-gray-850',//2.11更新内容：适配更新新选择器
             textSelector: 'p',
             userCondition: (element) => true
         },
         'chat.qwen.ai': {
-            messageSelector: 'div.rounded-3xl.bg-gray-50.dark\\:bg-gray-850',
+            messageSelector: 'div.dark\\:bg-gray-850',//2.11更新内容：适配更新新选择器
             textSelector: 'p',
             userCondition: (element) => true
         },
@@ -188,46 +210,51 @@
         updatePagination();
     }
 
-    // 渲染指定页的问题（使用 DOM 操作替代 innerHTML）
+    // 使找到的问题定位在屏幕中（使用 DOM 操作替代 innerHTML）
     function renderPage(page) {
-        // 清空列表容器
-        while (listContainer.firstChild) {
-            listContainer.removeChild(listContainer.firstChild);
-        }
-
-        const start = (page - 1) * pageSize;
-        const end = page * pageSize;
-        const pageQuestions = questions.slice(start, end);
-
-        pageQuestions.forEach((q, idx) => {
-            const listItem = document.createElement('li');
-            const shortText = q.text.substring(0, 15) + (q.text.length > 15 ? '...' : '');
-            listItem.textContent = `${isReversed ? questions.length - start - idx : start + idx + 1}: ${shortText}`;
-            listItem.style.padding = '8px 12px';
-            listItem.style.cursor = 'pointer';
-            listItem.style.fontSize = '13px';
-            listItem.style.color = '#333';
-            listItem.style.whiteSpace = 'nowrap';
-            listItem.style.overflow = 'hidden';
-            listItem.style.textOverflow = 'ellipsis';
-            listItem.style.borderBottom = '1px solid #f0f0f0';
-            listItem.style.transition = 'background 0.2s';
-            listItem.title = q.text;
-            listItem.addEventListener('mouseover', () => {
-                listItem.style.background = '#f5f5f5';
-            });
-            listItem.addEventListener('mouseout', () => {
-                listItem.style.background = 'none';
-            });
-            listItem.addEventListener('click', () => {
-                q.element.scrollIntoView({ behavior: 'smooth', block: 'start' });
-                floatWindow.style.opacity = '0';
-                setTimeout(() => floatWindow.style.display = 'none', 200);
-                console.log(`${questions.indexOf(q) + 1}: ${q.text.substring(0, 15)}...`);
-            });
-            listContainer.appendChild(listItem);
-        });
+    // 清空列表容器
+    while (listContainer.firstChild) {
+        listContainer.removeChild(listContainer.firstChild);
     }
+
+    const start = (page - 1) * pageSize;
+    const end = page * pageSize;
+    const pageQuestions = questions.slice(start, end);
+
+    pageQuestions.forEach((q, idx) => {
+        const listItem = document.createElement('li');
+        const shortText = q.text.substring(0, 15) + (q.text.length > 15 ? '...' : '');
+        listItem.textContent = `${isReversed ? questions.length - start - idx : start + idx + 1}: ${shortText}`;
+        listItem.style.padding = '8px 12px';
+        listItem.style.cursor = 'pointer';
+        listItem.style.fontSize = '13px';
+        listItem.style.color = '#333';
+        listItem.style.whiteSpace = 'nowrap';
+        listItem.style.overflow = 'hidden';
+        listItem.style.textOverflow = 'ellipsis';
+        listItem.style.borderBottom = '1px solid #f0f0f0';
+        listItem.style.transition = 'background 0.2s';
+        listItem.title = q.text;
+        listItem.addEventListener('mouseover', () => {
+            listItem.style.background = '#f5f5f5';
+        });
+        listItem.addEventListener('mouseout', () => {
+            listItem.style.background = 'none';
+        });
+        listItem.addEventListener('click', () => {
+            // 判断是否为 copilot.microsoft.com
+            if (window.location.hostname === 'copilot.microsoft.com') {
+                q.element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            } else {
+                q.element.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            }
+            floatWindow.style.opacity = '0';
+            setTimeout(() => floatWindow.style.display = 'none', 200);
+            console.log(`${questions.indexOf(q) + 1}: ${q.text.substring(0, 15)}...`);
+        });
+        listContainer.appendChild(listItem);
+    });
+}
 
     // 更新分页控件
     function updatePagination() {
