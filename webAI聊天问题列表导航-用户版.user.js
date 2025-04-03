@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         webAI聊天问题列表导航
 // @namespace    http://tampermonkey.net/
-// @version      3.0.0
+// @version      3.1.0
 // @description  通过点击按钮显示用户问题列表，支持导航到特定问题、分页功能、正序/倒序切换，自动加载历史记录
 // @author       yutao
 // @match        https://grok.com/chat/*
@@ -12,6 +12,9 @@
 // @match        https://copilot.microsoft.com/chats/*
 // @match        https://chatgpt.com/c/*
 // @match        https://chat.deepseek.com/a/chat/*
+// @match        https://tongyi.aliyun.com/*
+// @match        https://www.doubao.com/*
+
 // @grant        none
 // MIT License
 // 
@@ -34,6 +37,8 @@
 // LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.@license
+// @downloadURL https://update.greasyfork.org/scripts/528739/webAI%E8%81%8A%E5%A4%A9%E9%97%AE%E9%A2%98%E5%88%97%E8%A1%A8%E5%AF%BC%E8%88%AA.user.js
+// @updateURL https://update.greasyfork.org/scripts/528739/webAI%E8%81%8A%E5%A4%A9%E9%97%AE%E9%A2%98%E5%88%97%E8%A1%A8%E5%AF%BC%E8%88%AA.meta.js
 // ==/UserScript==
 
 (function () {
@@ -41,6 +46,22 @@
 
     // 配置对象，定义不同网站的聊天消息选择器和条件
     const config = {
+        'tongyi.aliyun.com': {
+            messageSelector: 'div[class^="questionItem-"]',
+            textSelector: 'div[class^="bubble-"]',
+            userCondition: (element) => {
+                // 简化条件，只检查是否为问题项元素
+                return element.className.indexOf('questionItem-') > -1;
+            },
+            scrollContainerSelector: 'div[class*="chat-container"], div[class*="contentWrapper"], div[class*="scroll"]'
+        },
+        "www.doubao.com": {
+            messageSelector: 'div[data-testid="send_message"]',
+            textSelector: 'div[data-testid="message_text_content"]',
+            userCondition: (element) => true,
+            scrollContainerSelector:
+              'div[class*="scrollable-"][class*="show-scrollbar-"]',
+          },
         'grok.com': {
             messageSelector: 'div.message-bubble',
             textSelector: 'span.whitespace-pre-wrap',
@@ -95,15 +116,56 @@
             scrollContainerSelector: '.scroll-container'
         }
     };
+    const genericConfig = {
+        // 消息选择器：匹配常见的消息元素模式
+        messageSelector: 'div[class*="message"], div[class*="chat"], div[class*="user"], div[class*="question"], div.bubble, article, div[role="listitem"]',
+        
+        // 文本选择器：匹配常见的文本容器
+        textSelector: 'div[class*="text"], div[class*="content"], p, span[class*="content"], pre, div.markdown',
+        
+        // 用户消息条件：使用多种通用的方法识别用户消息
+        userCondition: (element) => {
+            // 检查常见的用户消息类名
+            if (element.classList.toString().includes('user') || 
+                element.classList.toString().includes('question') ||
+                element.classList.toString().includes('self') ||
+                element.classList.toString().includes('right')||
+                element.classList.toString().includes('message'))
+                return true;
+                
+            // 检查常见的用户角色属性
+            if (element.getAttribute('data-role') === 'user' || 
+                element.getAttribute('data-author') === 'user' ||
+                element.getAttribute('data-message-author-role') === 'user')
+                return true;
+                
+            // 检查布局特征 (右对齐通常表示用户消息)
+            const style = window.getComputedStyle(element);
+            if (style.justifyContent === 'flex-end' || 
+                style.textAlign === 'right' ||
+                style.alignSelf === 'flex-end')
+                return true;
+                
+            // 检查文本内容特征：如果没有包含AI常用的前缀标识
+            const text = element.textContent.trim().toLowerCase();
+            if (text && text.length > 0 && 
+                !text.startsWith('ai:') && 
+                !text.startsWith('assistant:') &&
+                !text.startsWith('bot:'))
+                return true;
+                
+            return false;
+        },
+        
+        // 滚动容器选择器：匹配常见的滚动容器
+        scrollContainerSelector: 'div[class*="overflow"], div[class*="scroll"], div[class*="chat-container"], div[class*="message-container"], #messages-container, main'
+    };
 
     // 获取当前域名并选择配置
     const hostname = window.location.hostname;
-    const currentConfig = config[hostname] || {
-        messageSelector: 'div[class*=message], div[class*=chat], div[class*=user]',
-        textSelector: null,
-        userCondition: (element) => true,
-        scrollContainerSelector: 'main, .chat-container, #chat'
-    };
+    
+    // 获取当前网站的配置，如果没有特定配置则使用通用配置
+    const currentConfig = config[hostname] || genericConfig;
 
     // 创建美化后的浮动按钮
     const button = document.createElement('button');
